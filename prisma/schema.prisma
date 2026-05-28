@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  password    String
+  phone       String?
+  role        Role      @default(CUSTOMER)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  orders       Order[]
+  cartItems    CartItem[]
+  activityLogs ActivityLog[]
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userName  String
+  userRole  String
+  action    String
+  target    String?
+  targetId  String?
+  detail    String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String
+  nameEn   String?
+  icon     String?
+  products Product[]
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  name         String
+  nameEn       String?
+  description  String?
+  image        String?
+  pricePerGram Float
+  minGram      Int      @default(100)
+  maxGram      Int      @default(10000)
+  stepGram     Int      @default(50)
+  stock        Float?
+  unit         String   @default("ກຣາມ")
+  isVacuum     Boolean  @default(true)
+  isActive     Boolean  @default(true)
+  categoryId   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category   Category?   @relation(fields: [categoryId], references: [id])
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  userId    String
+  productId String
+  grams     Float
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  orderNumber    String      @unique
+  userId         String
+  totalAmount    Float
+  status         OrderStatus @default(PENDING)
+  deliveryDate   DateTime?
+  address        String?
+  note           String?
+  slipImage      String?
+  slipUploadedAt DateTime?
+  googleMapsLink String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id])
+  items OrderItem[]
+}
+
+model OrderItem {
+  id           String @id @default(cuid())
+  orderId      String
+  productId    String
+  gramsPerBag  Float  @default(0)  // ກຣາມຕໍ່ຖົງ
+  quantity     Int    @default(1)  // ຈຳນວນຖົງ
+  grams        Float               // ກຣາມລວມ (gramsPerBag × quantity)
+  pricePerGram Float
+  totalPrice   Float
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model PaymentQR {
+  id            String   @id @default(cuid())
+  image         String
+  bankName      String
+  accountName   String
+  accountNumber String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  CUSTOMER
+}
+
+enum OrderStatus {
+  PENDING
+  SLIP_UPLOADED
+  CONFIRMED
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
