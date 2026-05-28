@@ -51,28 +51,44 @@ export default function AdminProductsPage() {
     setImagePreview(p.image ?? ""); setImageFile(null); setShowForm(true);
   };
 
-  const uploadImage = async (file: File) => {
-    const fd = new FormData(); fd.append("file", file); fd.append("folder", "products");
+  const uploadImage = async (file: File): Promise<string | null> => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("folder", "products");
     const res = await fetch("/api/upload", { method: "POST", body: fd });
-    return (await res.json()).url as string;
+    const data = await res.json();
+    if (!res.ok || !data.url) {
+      alert(`Upload ຜິດພາດ: ${data.error ?? "ບໍ່ຮູ້ສາເຫດ"}`);
+      return null;
+    }
+    return data.url as string;
   };
 
   const handleSave = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault(); setSaving(true);
-    let imageUrl = form.image;
-    if (imageFile) imageUrl = await uploadImage(imageFile);
+    e.preventDefault();
+    setSaving(true);
+    let imageUrl: string | null = form.image || null;
+    if (imageFile) {
+      const uploaded = await uploadImage(imageFile);
+      if (uploaded === null) { setSaving(false); return; }
+      imageUrl = uploaded;
+    }
     const payload = {
-      ...form, image: imageUrl,
+      name: form.name, nameEn: form.nameEn, description: form.description,
+      image: imageUrl,
       pricePerGram: Number(form.pricePerGram),
       minGram: Number(form.minGram),
       maxGram: Number(form.maxGram),
       stepGram: Number(form.stepGram),
+      isVacuum: form.isVacuum,
       categoryId: form.categoryId || null,
     };
-    if (editing) {
-      await fetch(`/api/products/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    } else {
-      await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const res = editing
+      ? await fetch(`/api/products/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+      : await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(`ບັນທຶກຜິດພາດ: ${d.error ?? res.status}`);
     }
     setSaving(false); setShowForm(false); load();
   };
